@@ -12,6 +12,7 @@ the algorithm. However, if the hammer % value is less than 1.0, then hammers wil
 to the end. Further, note that all costs are in terms of spell traces.
 """
 from ..framework import Framework as _FW
+from random import random
 
 class SpellTraceFramework(_FW):
     """
@@ -48,27 +49,178 @@ class SpellTraceFramework(_FW):
                "Scroll Cost": "Sets the cost of the current spell trace scroll being used",
                "Scroll %": "Sets the pass rate for the spell trace scroll (0.0 - 1.0)",
                "Guild Save %": "Sets the rate for at which the guild slot saving activates (0.00 - 0.04)"}
+    
+    # CLASS INTRINSICS
+    ARG_MAPPING = {"Num Slots" : "eqpSlots",
+                   "CSS Cost" : "cssCost",
+                   "CSS %" : "cssRate",
+                   "Inno Cost" : "innoCost",
+                   "Inno %" : "innoRate",
+                   "Inno Fail Count" : "innoAfterTol",
+                   "Use Hammer" : "useHammer",
+                   "Hammer Cost" : "hammerCost",
+                   "Hammer %" : "hammerRate",
+                   "Scroll Cost" : "scrollCost",
+                   "Scroll %" : "scrollRate",
+                   "Guild Save %" : "guildSaveRate"}
 
     # CLASS FUNCS
     def __init__(self):
         """
-        Set up custom values for interface here along with any references that may be needed during
-        simulation.
+        Sets up a simple framework for testing spell trace enhancement.
         """
         pass
 
-    def performTrial(self, **kwargs) -> dict:
+    def performTrial(self, eqpSlots: int, cssCost: int, cssRate: float, innoCost: int, innoRate: float,
+                     innoAfterTol: int, useHammer: bool, hammerCost: int, hammerRate: float, scrollCost: int,
+                     scrollRate: float, guildSaveRate: float) -> dict:
         """
-        Performs a SINGLE trial simulation that caps out at a max horizon of maxHorizon and
-        takes in all values in kwargs as potential arguments for the simulation.
-
-        Note: It is strongly recommended to include a maximum horizon for trials that can possible
-              go on infinitely, but it's ultimately a choice in the end...
+        Performs a trial simulation for an enhancement of an item with a given number of slots using a given
+        set of parameters relating to item usage.
 
         Args:
-            **kwArgs: Collection representing the arguments to use as according to self specification
+            eqpSlots : number of slots to scroll
+            cssCost : trace cost of css
+            cssRate : pass rate of css
+            innoCost : trace cost of inno scroll
+            innoRate : pass rate of inno scroll
+            innoAfter : # failure tolerance before forced inno (implicitly all CSS after)
+            useHammer : whether or not to hammer item in simulation
+            hammerCost : trace cost of hammer
+            hammerRate : pass rate of hammer
+            scrollCost : trace cost of spell trace scroll being used
+            scrollRate : pass rate of the spell trace scroll
+            guildSaveRate : rate at which the guild slot saving skill can proc on item
 
         Returns:
-            A dictionary with all possibly relevant information collected.
+            A dictionary with the following metrics as useful information for plotting:
+                {"totalTraceCost", "innoTraceCost", "scrollTraceCost", "cssTraceCost",
+                 "numFailedScrolls", "numFailedInnos", "numFailedCSS", "numFailedHammers",
+                 "numPassedScrolls", "numPassedInnos", "numPassedCSS", "numPassedHammers",
+                 "numGuildSaves"}
         """
-        raise NotImplementedError("Framework cannot be executed as it is a template class.")
+        # Prepare our values for return
+        innoCosts, scrollCosts, cssCosts, hammerCosts = 0, 0, 0, 0
+        fScrolls, fInnos, fCSS, fHammers = 0, 0, 0, 0
+        pScrolls, pInnos, pCSS, pHammers = 0, 0, 0, 0
+        numGS = 0
+
+        # Some properties that are used for keeping track of sim prog
+        eqpHammered = False
+        curPassed, curFailed = 0, 0
+        totSlots = eqpSlots + 2 if useHammer else eqpSlots
+        availSlots = eqpSlots
+        
+        # functor for resetting progress
+        def resetState():
+            eqpHammered = False
+            curPassed, curFailed = 0, 0
+            availSlots = eqpSlots
+
+        # Then proceed with simulation of spell trace enhancement
+        while curPassed < totSlots:
+            # if hammer is a 100% hammer, apply it first
+            if useHammer and (not eqpHammered and hammerRate == 1.0):
+                eqpHammered = True
+                availSlots += 2
+                pHammers += 2
+                hammerCosts += 2 * hammerCost
+
+            # enhance if possible
+            if availSlots > 0:
+                scrollPassed = (random() <= scrollRate)
+                scrollCosts += scrollCost
+                if scrollPassed:
+                    availSlots -= 1
+                    pScrolls += 1
+                    curPassed += 1
+                else:
+                    guildSaved = (random() < guildSaveRate)
+                    numGS += 1 if guildSaved else 0
+                    availSlots -= 0 if guildSaved else 1
+                    fScrolls += 1
+                    curFailed  += 0 if guildSaved else 1
+
+            # check if inno, hammer, or css has to be used
+            if curFailed > innoAfterTol:
+                # accumulate cost
+                inProcCost, inProcFails = self.simulateForcePassedScroll(innoRate, innoCost)
+                innoCosts += inProcCost
+                fInnos += inProcFails
+                pInnos += 1
+
+                # reset state and restart process
+                resetState()
+            elif useHammer and (availSlots == 0 and not eqpHammered):
+                # update values with used hammers
+                eqpHammered = True
+                hammerCosts += 2 * hammerCost
+                hammProcFails = self.generateHammerOutcomes(hammerRate)
+                fHammers += hammProcFails
+                pHammers += (2-hammProcFails)
+
+                # Item slots + 2 but available slots scale only with passed hammers
+                curFailed += hammProcFails
+                availSlots += (2-hammProcFails)
+            elif availSlots == 0 and curFailed > 0:
+                # accumulate cost
+                cssProcCost, cssProcFails = self.simulateForcePassedScroll(cssRate, cssCost)
+                cssCosts += cssProcCost
+                fCSS += cssProcFails
+                pCSS += 1
+
+                # adjust state to reflect CSS passing
+                availSlots += 1
+                curFailed -= 1
+
+        # nearly organize all values into legible return dict
+        return {"totalTraceCost" : innoCosts + cssCosts + scrollCosts + hammerCosts, 
+                "innoTraceCost" : innoCosts,
+                "scrollTraceCost" : scrollCosts,
+                "cssTraceCost" : cssCosts,
+                "hammerTraceCost" : hammerCosts,
+                "numFailedScrolls" : fScrolls,
+                "numFailedInnos" : fInnos, 
+                "numFailedCSS" : fCSS, 
+                "numFailedHammers" : fHammers,
+                "numPassedScrolls" : pScrolls, 
+                "numPassedInnos" : pInnos, 
+                "numPassedCSS" : pCSS, 
+                "numPassedHammers" : pHammers,
+                "numGuildSaves" : numGS}
+
+    def generateHammerOutcomes(self, hammerRate: float) -> int:
+        """
+        Sub-simulation for applying two hammers. Hammers always increase slot count but can
+        either return a free slot or taken slot depending on success rate.
+
+        Args:
+            hammerRate : The pass rate for the hammer
+
+        Returns: 
+            The number of failures) for the 2-step process
+        """
+        # roll twice
+        fPass, sPass = [(random() < hammerRate) for _ in range(2)]
+
+        return 2-fPass-sPass
+
+    def simulateForcePassedScroll(self, scrollRate: float, scrollCost: int) -> tuple[int, int]:
+        """
+        Sub-simulation for forced (css/inno) scrolling. Continuously attempts to pass the success rate
+        and returns the associated cost and number of failures from the attempts.
+
+        Args:
+            scrollRate : The pass rate for the innocence scroll
+            scrollCost : The trace cost for the innocence scroll
+
+        Returns:
+            A tuple of (total trace cost, number of failures) for the process
+        """
+        curCost, curFails = 0, 0
+        while (random() > scrollRate): # while we fail inno scrolls
+            curCost += scrollCost
+            curFails += 1
+        
+        return (curCost + scrollCost, curFails)
+    

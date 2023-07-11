@@ -31,6 +31,9 @@ class Framework():
     ARG_MAN = {"EXAMPLE1" : "Sets the specification EXAMPLE1 to some integer value.",
                "EXAMPLE2" : "Sets the specification EXAMPLE2 to some float value.",
                "EXAMPLE3" : "Sets the specification EXAMPLE3 to some desired integer or float value."}
+    
+    # CLASS INTRINSICS
+    ARG_MAPPING = {}    # used to convert human legible params above to func params
 
     # CLASS FUNCS
     def __init__(self):
@@ -40,7 +43,7 @@ class Framework():
         """
         pass
 
-    def performTrial(self, **kwargs) -> dict:
+    def performTrial(self, EXAMPLE1, EXAMPLE2, EXAMPLE3) -> dict:
         """
         Performs a SINGLE trial simulation that caps out at a max horizon of maxHorizon and
         takes in all values in kwargs as potential arguments for the simulation.
@@ -55,6 +58,20 @@ class Framework():
             A dictionary with all possibly relevant information collected.
         """
         raise NotImplementedError("Framework cannot be executed as it is a template class.")
+    
+    def mapArgs(self, userInputDict: dict) -> dict:
+        """
+        Prepares for trials by converting a dict with human legible parameters into the appropriate
+        keyword dictionary necessary for performTrial to function properly. This depends on the
+        class intrinsic ARG_MAPPING being properly overriden for every new class.
+
+        (If not overwritten, the mapping is simply returned as is and is assumed to conform to
+        the arguments of performTrial as is.)
+        """
+        if not self.ARG_MAPPING:
+            return userInputDict
+        else:
+            return {self.ARG_MAPPING[userKey]:val for userKey,val in userInputDict.items()}
     
     def announceSelf(self) -> str:
         """
@@ -79,11 +96,16 @@ class Framework():
         then returns a list of names for ill-defined arguments. If no invalid argument is present, then
         an empty list is returned.
 
+        If argDict is ill-formed (extra/missing args), then this throws an exception.
+
         Args:
             argDict: A collection representing the mapping between arguments and the values to pass to them.
         """
-        invalidArgs = list()
+        # edge case with more args than necessary
+        if len(argDict) != len(self.ARG_TYPES):
+            raise ValueError("Extra argument detected.")
 
+        invalidArgs = list()
         for argName, argTypes in self.ARG_TYPES.items():
             if argName not in argDict:
                 raise ValueError("Input argument dict did not contain expected argument for variable {}".format(argName))
