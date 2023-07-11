@@ -19,9 +19,9 @@ class Framework():
     ARG_DIST : int = 16
 
     # CLASS VAR PARAMETERS
-    MAN_MSG = ("Framework provides the general interface for simulation calculation along with a" +
-               "templated methods to make future frameworks simpler to derive. It provides some" +
-               "basic type checking to ensure that user arguments will not create errors in the" +
+    MAN_MSG = ("Framework provides the general interface for simulation calculation along with a " +
+               "templated methods to make future frameworks simpler to derive. It provides some " +
+               "basic type checking to ensure that user arguments will not create errors in the " +
                "program.")
     
     ARG_TYPES : dict[str, type|tuple[type,...]] = {"EXAMPLE1": int,
@@ -55,9 +55,28 @@ class Framework():
             **kwArgs: Collection representing the arguments to use as according to self specification
 
         Returns:
-            A dictionary with all possibly relevant information collected.
+            A dictionary with all possibly relevant information collected from the trial.
         """
         raise NotImplementedError("Framework cannot be executed as it is a template class.")
+    
+    """
+    NOTE: These functions below can be overriden, but they should be generic enough to work for most instances.
+    """
+    def checkAndPerformTrial(self, userInputArgs: dict) -> dict:
+        """
+        A wrapper around the above performTrial that also ensures that the input args are at least
+        of the correct format to prevent some basic user-causes misfunction.
+
+        Args:
+            userInputArgs: A collection representing the arguments to pass into the function
+
+        Returns:
+            A dictionary with all possible relevant information collected from the trial.
+        """
+        if not self.checkInvalidArgs(userInputArgs):
+            return self.performTrial(**self.mapArgs(userInputArgs))
+        else:
+            raise ValueError("Input args were of an incorrect format.")
     
     def mapArgs(self, userInputDict: dict) -> dict:
         """

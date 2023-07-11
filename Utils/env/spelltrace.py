@@ -12,7 +12,7 @@ the algorithm. However, if the hammer % value is less than 1.0, then hammers wil
 to the end. Further, note that all costs are in terms of spell traces.
 """
 from ..framework import Framework as _FW
-from random import random
+from random import Random as _Rand
 
 class SpellTraceFramework(_FW):
     """
@@ -20,8 +20,8 @@ class SpellTraceFramework(_FW):
     """
 
     # CLASS VAR PARAMETERS
-    MAN_MSG = ("Spell Trace Enhancement framework. Provides the base framework needed to perform" +
-               "enhancement of items using the available spell trace system. Constants for the" +
+    MAN_MSG = ("Spell Trace Enhancement framework. Provides the base framework needed to perform " +
+               "enhancement of items using the available spell trace system. Constants for the " +
                "system are defined externally outside of classes for convenience.")
     
     ARG_TYPES : dict[str, type|tuple[type,...]] = {"Num Slots": int,
@@ -65,11 +65,15 @@ class SpellTraceFramework(_FW):
                    "Guild Save %" : "guildSaveRate"}
 
     # CLASS FUNCS
-    def __init__(self):
+    def __init__(self, rSeed: int|None = None):
         """
         Sets up a simple framework for testing spell trace enhancement.
+
+        Args:
+            rSeed : A set seed for the randomizer used here
         """
-        pass
+        self.rng = _Rand(rSeed)
+        self.random = self.rng.random
 
     def performTrial(self, eqpSlots: int, cssCost: int, cssRate: float, innoCost: int, innoRate: float,
                      innoAfterTol: int, useHammer: bool, hammerCost: int, hammerRate: float, scrollCost: int,
@@ -84,7 +88,7 @@ class SpellTraceFramework(_FW):
             cssRate : pass rate of css
             innoCost : trace cost of inno scroll
             innoRate : pass rate of inno scroll
-            innoAfter : # failure tolerance before forced inno (implicitly all CSS after)
+            innoAfter : failure tolerance before forced inno (implicitly all CSS after)
             useHammer : whether or not to hammer item in simulation
             hammerCost : trace cost of hammer
             hammerRate : pass rate of hammer
@@ -113,6 +117,7 @@ class SpellTraceFramework(_FW):
         
         # functor for resetting progress
         def resetState():
+            nonlocal eqpHammered, curPassed, curFailed, availSlots
             eqpHammered = False
             curPassed, curFailed = 0, 0
             availSlots = eqpSlots
@@ -128,14 +133,14 @@ class SpellTraceFramework(_FW):
 
             # enhance if possible
             if availSlots > 0:
-                scrollPassed = (random() <= scrollRate)
+                scrollPassed = (self.random() <= scrollRate)
                 scrollCosts += scrollCost
                 if scrollPassed:
                     availSlots -= 1
                     pScrolls += 1
                     curPassed += 1
                 else:
-                    guildSaved = (random() < guildSaveRate)
+                    guildSaved = (self.random() < guildSaveRate)
                     numGS += 1 if guildSaved else 0
                     availSlots -= 0 if guildSaved else 1
                     fScrolls += 1
@@ -201,7 +206,7 @@ class SpellTraceFramework(_FW):
             The number of failures) for the 2-step process
         """
         # roll twice
-        fPass, sPass = [(random() < hammerRate) for _ in range(2)]
+        fPass, sPass = [(self.random() < hammerRate) for _ in range(2)]
 
         return 2-fPass-sPass
 
@@ -218,7 +223,7 @@ class SpellTraceFramework(_FW):
             A tuple of (total trace cost, number of failures) for the process
         """
         curCost, curFails = 0, 0
-        while (random() > scrollRate): # while we fail inno scrolls
+        while (self.random() > scrollRate): # while we fail inno scrolls
             curCost += scrollCost
             curFails += 1
         
