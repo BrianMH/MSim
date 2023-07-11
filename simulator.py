@@ -5,13 +5,14 @@ Harness for performing model simulation. Frameworks for simulating are
 expected to have an unknown number of desired parameters along with an
 explanation of what is expected for each entry.
 """
-import Utils.Framework as Framework
+import utils.framework as framework
+import utils.env
 
 class MarkovSim():
     def __init__(self):
-        self.curFramework : Framework.Framework = Framework.Framework()
+        self.curFramework : framework.Framework = framework.Framework()
 
-    def selectFramework(self, fwork: Framework.Framework):
+    def selectFramework(self, fwork: framework.Framework):
         """
         Changes the current simulation into another according to fwork specifications.
         """
@@ -32,7 +33,7 @@ class MarkovSim():
         return resList
 
     @staticmethod
-    def announceFrameworkArgs(fwork: Framework.Framework):
+    def announceFrameworkArgs(fwork: framework.Framework):
         """
         Presents user legible info about what a given framework expects as arguments for
         a proper simulation trial.
@@ -41,5 +42,4 @@ class MarkovSim():
 
 
 if __name__ == "__main__":
-    testSim = MarkovSim()
-    testSim.announceFrameworkArgs(testSim.curFramework)
+    print(utils.env.__all__)
