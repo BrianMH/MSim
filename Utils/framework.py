@@ -24,9 +24,9 @@ class Framework():
                "basic type checking to ensure that user arguments will not create errors in the " +
                "program.")
     
-    ARG_TYPES : dict[str, type|tuple[type,...]] = {"EXAMPLE1": int,
-                                                "EXAMPLE2": float,
-                                                "EXAMPLE3": (int, float)}
+    ARG_TYPES : dict[str, type[int | float | str]|tuple[type[int | float | str],...]] = {"EXAMPLE1": int,
+                                                                                         "EXAMPLE2": float,
+                                                                                         "EXAMPLE3": (float, int)}
     
     ARG_MAN = {"EXAMPLE1" : "Sets the specification EXAMPLE1 to some integer value.",
                "EXAMPLE2" : "Sets the specification EXAMPLE2 to some float value.",
@@ -77,6 +77,18 @@ class Framework():
             return self.performTrial(**self.mapArgs(userInputArgs))
         else:
             raise ValueError("Input args were of an incorrect format.")
+        
+    def getArgs(self) -> list[str]:
+        """
+        Returns the arguments list as an iterable object.
+        """
+        return list(self.ARG_MAN.keys())
+    
+    def getArgTypes(self) -> dict[str, type[int | float | str]|tuple[type[int | float | str],...]]:
+        """
+        Returns a collection representing the framework arguments along with the allowed types.
+        """
+        return self.ARG_TYPES.copy()
     
     def mapArgs(self, userInputDict: dict) -> dict:
         """
