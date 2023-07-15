@@ -82,7 +82,7 @@ def test_absolute_css_trial(num_slots: int, use_hammer: bool, scroll_cost: int =
 @pytest.mark.parametrize('num_slots', [1, 2, 5])
 @pytest.mark.parametrize('use_hammer', [False, True])
 def test_absolute_inno_trial(num_slots: int, use_hammer: bool, scroll_cost: int = 201):
-    testFW = spelltrace.SpellTraceFramework(RAND_SEED)
+    testFW = spelltrace.SpellTraceFramework(RAND_SEED, False) # force inno usage even after hammers
 
     # now test execution using inno immediately after any failure
     res = testFW.performTrial(num_slots, 1, 1.0, 1, 1.0, 0, use_hammer, 0, 1.0, scroll_cost, 0.1, 0.0)

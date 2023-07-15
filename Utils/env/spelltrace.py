@@ -65,15 +65,17 @@ class SpellTraceFramework(_FW):
                    "Guild Save %" : "guildSaveRate"}
 
     # CLASS FUNCS
-    def __init__(self, rSeed: int|None = None):
+    def __init__(self, rSeed: int|None = None, greedyFinish: bool = True):
         """
         Sets up a simple framework for testing spell trace enhancement.
 
         Args:
             rSeed : A set seed for the randomizer used here
+            greedyFinish : Determines whether or not to use inno tolerance following hamers near the end.
         """
         self.rng = _Rand(rSeed)
         self.random = self.rng.random
+        self.greedyAfterInno = greedyFinish
 
     def performTrial(self, eqpSlots: int, cssCost: int, cssRate: float, innoCost: int, innoRate: float,
                      innoAfterTol: int, useHammer: bool, hammerCost: int, hammerRate: float, scrollCost: int,
@@ -110,27 +112,20 @@ class SpellTraceFramework(_FW):
         numGS = 0
 
         # Some properties that are used for keeping track of sim prog
-        eqpHammered = False
+        eqpHammers = False
         curPassed, curFailed = 0, 0
         totSlots = eqpSlots + 2 if useHammer else eqpSlots
         availSlots = eqpSlots
         
         # functor for resetting progress
         def resetState():
-            nonlocal eqpHammered, curPassed, curFailed, availSlots
-            eqpHammered = False
+            nonlocal eqpHammers, curPassed, curFailed, availSlots
+            eqpHammers = 0
             curPassed, curFailed = 0, 0
             availSlots = eqpSlots
 
         # Then proceed with simulation of spell trace enhancement
         while curPassed < totSlots:
-            # if hammer is a 100% hammer, apply it first
-            if useHammer and (not eqpHammered and hammerRate == 1.0):
-                eqpHammered = True
-                availSlots += 2
-                pHammers += 2
-                hammerCosts += 2 * hammerCost
-
             # enhance if possible
             if availSlots > 0:
                 scrollPassed = (self.random() <= scrollRate)
@@ -156,17 +151,23 @@ class SpellTraceFramework(_FW):
 
                 # reset state and restart process
                 resetState()
-            elif useHammer and (availSlots == 0 and not eqpHammered):
+            elif useHammer and (availSlots == 0 and eqpHammers < 2):
                 # update values with used hammers
-                eqpHammered = True
-                hammerCosts += 2 * hammerCost
-                hammProcFails = self.generateHammerOutcomes(hammerRate)
-                fHammers += hammProcFails
-                pHammers += (2-hammProcFails)
+                eqpHammers += 1
+                hammerCosts += hammerCost
+                hammProcSucc = (self.random() < hammerRate)
+                fHammers += (1-hammProcSucc)
+                pHammers += hammProcSucc
 
                 # Item slots + 2 but available slots scale only with passed hammers
-                curFailed += hammProcFails
-                availSlots += (2-hammProcFails)
+                curFailed += (1-hammProcSucc)
+                availSlots += hammProcSucc
+
+                # Generally, once we start hammering, we no longer consider innocence scrolling,
+                # but it can optionally be turned off (be warned this can increase the trial
+                # horizon significantly!)
+                if self.greedyAfterInno:
+                    innoAfterTol += 1
             elif availSlots == 0 and curFailed > 0:
                 # accumulate cost
                 cssProcCost, cssProcFails = self.simulateForcePassedScroll(cssRate, cssCost)
@@ -193,22 +194,6 @@ class SpellTraceFramework(_FW):
                 "numPassedCSS" : pCSS, 
                 "numPassedHammers" : pHammers,
                 "numGuildSaves" : numGS}
-
-    def generateHammerOutcomes(self, hammerRate: float) -> int:
-        """
-        Sub-simulation for applying two hammers. Hammers always increase slot count but can
-        either return a free slot or taken slot depending on success rate.
-
-        Args:
-            hammerRate : The pass rate for the hammer
-
-        Returns: 
-            The number of failures) for the 2-step process
-        """
-        # roll twice
-        fPass, sPass = [(self.random() < hammerRate) for _ in range(2)]
-
-        return 2-fPass-sPass
 
     def simulateForcePassedScroll(self, scrollRate: float, scrollCost: int) -> tuple[int, int]:
         """

@@ -193,6 +193,6 @@ if __name__ == "__main__":
     resFunc = promptUserForOption(curSim)
     results = resFunc()
 
-    # saves results from execution in a file
-    with open("res_output.pkl", 'wb') as outFile:
+    # saves results from execution in a file (maybe prompt user before saving?)
+    with open("./analysis/res_output.pkl", 'wb') as outFile:
         pickle.dump(results, outFile)
