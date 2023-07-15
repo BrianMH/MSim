@@ -127,14 +127,14 @@ class Framework():
         then returns a list of names for ill-defined arguments. If no invalid argument is present, then
         an empty list is returned.
 
-        If argDict is ill-formed (extra/missing args), then this throws an exception.
+        If argDict is ill-formed (extra/missing/undefined args), then this throws an exception.
 
         Args:
             argDict: A collection representing the mapping between arguments and the values to pass to them.
         """
         # edge case with more args than necessary
         if len(argDict) != len(self.ARG_TYPES):
-            raise ValueError("Extra argument detected.")
+            raise ValueError("Improper argument length detected.")
 
         invalidArgs = list()
         for argName, argTypes in self.ARG_TYPES.items():

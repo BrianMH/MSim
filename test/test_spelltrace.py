@@ -98,7 +98,7 @@ Branches on:
     num_slots: 0, 1, >1
     inno_tol: 0, 0 < x < num_slots, num_slots (x > num_slots)
     use_hammer: true, false
-    scroll_rate: 0, 0 < x < 1.0, 1.0         => 0 implies infinite loop so untested here
+    scroll_rate: 0 < x < 1.0, 1.0         => 0 implies infinite loop so untested here
     gs_rate: 0, >0
 """
 @pytest.mark.parametrize('num_slots', [0, 1, 4])

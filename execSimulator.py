@@ -47,11 +47,50 @@ def generateGridSearchFunctor(curSim: MarkovSim) -> Callable:
     Generates a callable functor for a prepared grid search parameters after
     prompting user for specific args.
     """
-    print("Select whether or not the simulation will be dynamic on the following arguments: (y\\n)")
-    for curArgStr in curSim.getFrameworkArgs():
-        pass
+    print("Please enter desired parameter values (space separated for ranges) for the following arguments:")
+    argDict : dict = {argStr:None for argStr in curSim.getFrameworkArgs()}
+    listArgsDict = argDict.copy()
+    while not curSim.checkValidUserArgs(argDict):
+        for curArgStr, argType in curSim.getFrameworkArgType().items():
+            # grab least restrictive type from tuple
+            if isinstance(argType, tuple):
+                curType = argType[0]
+            else:
+                curType = argType
+            
+            # grab input and convert all arguments
+            inputList = promptUserForListArgs("{: >15} :".format(curArgStr), curType)
 
-    raise NotImplementedError()
+            # finally allow argDict to take the first argument as a sanity test while saving the rest
+            argDict[curArgStr] = inputList[0]
+            listArgsDict[curArgStr] = inputList
+
+    # Finally parse through the list args to separate into static and non-static values for testing
+    def splitListArgs(inputDict: dict[str, list]) -> tuple[dict, dict]:
+        """
+        Splits a dict into two separate dicts. One with mappings from a string to a collection of more than
+        one object, and another with mappings from a string to a collection with a single object (which
+        will be implicitly evaluted into just that object as the value).
+
+        Input dictionaries cannot have any empty values.
+
+        For example, calling splitListArgs({"A":["B"], "B":["C", "D"]}) returns two dicts:
+            1) {"A":"B"}
+            2) {"B":["C", "D"]}
+        """
+        sDict = dict()
+        lDict = dict()
+        for dKey, dVal in inputDict.items():
+            if len(dVal) == 1:
+                sDict[dKey] = dVal[0]
+            else:
+                lDict[dKey] = dVal
+
+        return sDict, lDict
+
+    statics, nonStatics = splitListArgs(listArgsDict)
+
+    return lambda numTrials : curSim.gridSearch(numTrials, nonStatics, statics)
 
 def generateFixedParamFunctor(curSim: MarkovSim) -> Callable:
     """
@@ -84,6 +123,30 @@ def generateFixedParamFunctor(curSim: MarkovSim) -> Callable:
     
     # generate function from argDict
     return lambda numTrials : curSim.simulate(numTrials, argDict)
+
+def promptUserForListArgs(prompt: str, varType: type[float|int|str]) -> list[float|int|bool]:
+    """
+    Prompts a user to enter a space separated set of values that will be used for the parameter
+    sweep and returns it as a list of strings (output is unconverted).
+
+    Args:
+        prompt: The prompt to show the user.
+    """
+    argSet = set()
+    userInputs = input(prompt).strip().split(" ")
+    for userInput in userInputs:
+        if varType == bool:
+            match userInput.strip():
+                case "y":
+                    argSet.add(True)
+                case "n":
+                    argSet.add(False)
+                case "_":
+                    pass # undefined values add nothing to testing bounds
+        else:
+            argSet.add(varType(userInput))
+
+    return list(argSet)
 
 def promptUserForOption(curSim: MarkovSim) -> Callable:
     """
