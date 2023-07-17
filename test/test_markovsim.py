@@ -1,4 +1,6 @@
 """
+test_markovsim.py
+
 Tests the markov sim API using a dummy framework.
 """
 from utils.framework import Framework
@@ -38,6 +40,7 @@ def test_sim_framework_choosing():
     # and ensure nothing has been run within the framework
     assert frameRef.numExecutions == 0, "Framework should not be run prior to a simulation."
 
+
 def test_sim_framework_simulation_single_runs():
     '''
     Checks to make sure simulation runs are properly performed within the simulator.
@@ -51,6 +54,7 @@ def test_sim_framework_simulation_single_runs():
         assert len(res) == 1, "Should only contain one resultant dictionary per iteration."
         assert frameRef.numExecutions == curValue, "Framework should only be executing sim once."
         assert res[0]["result"] == curValue*2, "Did not generate proper output."
+
 
 def test_sim_framework_simulation_variable_runs():
     '''
@@ -70,6 +74,7 @@ def test_sim_framework_simulation_variable_runs():
         assert frameRef.numExecutions == totTrials, "Framework should only be executing sim {} times".format(curValue)
         for resDict in res:
             assert resDict["result"] == curValue*2, "Did not generate proper output for contained result dict."
+
 
 def test_sim_framework_grid_search_all_variadic():
     '''
@@ -92,6 +97,7 @@ def test_sim_framework_grid_search_all_variadic():
         assert resDict['result'] == resDict['iArg1'] + resDict['iArg2'], "Improper output detected from given input arguments."
         assert resDict['numExecutions'] == 1, "Result should have only been executed once."
 
+
 def test_sim_framework_grid_search_all_static():
     '''
     Makes sure that the grid search function passes the proper number of executions to the 
@@ -112,6 +118,7 @@ def test_sim_framework_grid_search_all_static():
         resDict = resDictList[0]
         assert resDict['result'] == resDict['iArg1'] + resDict['iArg2'], "Improper output detected from given input arguments."
         assert resDict['numExecutions'] == 1, "Result should have only been executed once."
+
 
 def test_sim_framework_dict_generator():
     '''

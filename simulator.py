@@ -7,7 +7,9 @@ explanation of what is expected for each entry.
 """
 import utils.framework as framework
 from itertools import product
-from typing import Generator
+from typing import Generator        # used to type output of gen func
+from tqdm import tqdm               # keeps track of our execution
+from functools import reduce        # used only to infer total cartesian product dim 
 
 class MarkovSim():
     MAX_OPTS = 2 # for now only two functions
@@ -30,7 +32,7 @@ class MarkovSim():
             raise ValueError("Number of trials must be a positive integer greater than 0.")
 
         resList = list()
-        for _ in range(numTrials):
+        for _ in tqdm(range(numTrials)):
             resList.append(self.curFramework.checkAndPerformTrial(simArgs))
 
         return resList
@@ -42,12 +44,14 @@ class MarkovSim():
         of all key-value pairs in gridArgs.
         """
         resDict = dict()
-        for vDict in self.varDictGen(gridArgs):
-            # get dict result
-            curResult = self.simulate(numTrials, simArgs = {**vDict, **simArgs})
+        with tqdm(total = reduce(lambda x,y:x*y, map(lambda dicTup: len(dicTup), gridArgs.values()))) as pbar:
+            for vDict in self.varDictGen(gridArgs):
+                # get dict result
+                curResult = self.simulate(numTrials, simArgs = {**vDict, **simArgs})
 
-            # neatly put into result dict according to arguments
-            resDict[tuple(vDict.items())] = curResult
+                # neatly put into result dict according to arguments
+                resDict[tuple(vDict.items())] = curResult
+                pbar.update(1)
 
         return resDict
     
