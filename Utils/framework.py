@@ -62,18 +62,19 @@ class Framework():
     """
     NOTE: These functions below can be overriden, but they should be generic enough to work for most instances.
     """
-    def checkAndPerformTrial(self, userInputArgs: dict) -> dict:
+    def checkAndPerformTrial(self, userInputArgs: dict, * , skipArgCheck: bool = False) -> dict:
         """
         A wrapper around the above performTrial that also ensures that the input args are at least
         of the correct format to prevent some basic user-causes misfunction.
 
         Args:
             userInputArgs: A collection representing the arguments to pass into the function
+            skipArgCheck: Option to skip the input argument check
 
         Returns:
             A dictionary with all possible relevant information collected from the trial.
         """
-        if not self.checkInvalidArgs(userInputArgs):
+        if skipArgCheck or not self.checkInvalidArgs(userInputArgs):
             return self.performTrial(**self.mapArgs(userInputArgs))
         else:
             raise ValueError("Input args were of an incorrect format.")

@@ -32,8 +32,11 @@ class MarkovSim():
             raise ValueError("Number of trials must be a positive integer greater than 0.")
 
         resList = list()
-        for _ in tqdm(range(numTrials)):
-            resList.append(self.curFramework.checkAndPerformTrial(simArgs))
+        for iterInd in tqdm(range(numTrials)):
+            if iterInd == 0:
+                resList.append(self.curFramework.checkAndPerformTrial(simArgs))
+            else: # subseq would have no errors with same args otherwise
+                resList.append(self.curFramework.checkAndPerformTrial(simArgs, skipArgCheck = True))
 
         return resList
     
