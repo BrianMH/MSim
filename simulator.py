@@ -47,7 +47,7 @@ class MarkovSim():
         of all key-value pairs in gridArgs.
         """
         resDict = dict()
-        with tqdm(total = reduce(lambda x,y:x*y, map(lambda dicTup: len(dicTup), gridArgs.values()))) as pbar:
+        with tqdm(total = reduce(lambda x,y:x*y, map(lambda dicTup: len(dicTup), gridArgs.values()), 1)) as pbar:
             for vDict in self.varDictGen(gridArgs):
                 # get dict result
                 curResult = self.simulate(numTrials, simArgs = {**vDict, **simArgs})
