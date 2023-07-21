@@ -237,11 +237,11 @@ class HexaStatFramework(_FW):
                 totResets += 1
                 curCore.resetNode()
             else:   # enhance
-                totCost += sum(curCore.levelNode())
+                totCost += curCore.levelNode()[1]
                 numEnhances += 1
 
         return {
-            "totalCost" : totCost,
+            "totalFragCost" : totCost,
             "totalEnhances" : numEnhances,
             "primaryLevel" : curCore.primaryStatLevel,
             "secondaryLevel" : curCore.secondStatLevel,
@@ -250,9 +250,10 @@ class HexaStatFramework(_FW):
         }
 
     def attemptPolicyImport(self, policyPath: str) -> None:
+        """ Tries to import a policy that represents a """
         with open(policyPath, 'rb') as inFile:
             curObj = pickle.load(inFile)
-            if not isinstance(curObj, Callable[[], float]):
+            if not isinstance(curObj, dict):
                 raise RuntimeError("Improper object type passed into load.")
             self.policy = curObj
 
