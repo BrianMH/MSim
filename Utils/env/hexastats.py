@@ -201,6 +201,9 @@ class HexaStatFramework(_FW):
         self.rng = _Rand(rSeed)
         self.random = self.rng.random
 
+        # flag for policy checking
+        self.loadedPolicy = False
+
         # initialize our policy dict (indicates when to reset)
         # our state space will be (enhance_level, primary_level) tuples
         self.policy : MutableMapping[tuple[int, int], bool] = defaultdict(lambda : False)
@@ -222,8 +225,9 @@ class HexaStatFramework(_FW):
 
         # Either import new policy or adjust based on target level
         try:
+            self.loadedPolicy = True
             self.attemptPolicyImport(policyPath)
-        except:
+        except RuntimeError:
             self.updatePolicyTarget(target)
 
         # Then run simulation until target reached
@@ -253,11 +257,14 @@ class HexaStatFramework(_FW):
 
     def attemptPolicyImport(self, policyPath: str) -> None:
         """ Tries to import a policy that represents a """
-        with open(policyPath, 'rb') as inFile:
-            curObj = pickle.load(inFile)
-            if not isinstance(curObj, dict):
-                raise RuntimeError("Improper object type passed into load.")
-            self.policy = curObj
+        try:
+            with open(policyPath, 'rb') as inFile:
+                curObj = pickle.load(inFile)
+                if not issubclass(curObj.__class__, dict):
+                    raise RuntimeError("Improper object type passed into load.")
+                self.policy = curObj
+        except FileNotFoundError:
+            pass
 
     def updatePolicyTarget(self, targetLevel: int) -> None:
         for lowerInd in range(1, targetLevel):

@@ -5,4 +5,4 @@ __pycache__/
 .pytest_cache
 
 # Ignore our data output (too large)
-*.pkl
+analysis/*.pkl
