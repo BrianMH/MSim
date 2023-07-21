@@ -99,7 +99,9 @@ class HexaStatCore():
             return self.PRIM_ARG_POS
         
         # then check secondary stats
-        if self.secondStatLevel == 10:
+        if self.secondStatLevel == 10 and self.thirdStatLevel == 10:
+            return self.PRIM_ARG_POS
+        elif self.secondStatLevel == 10:
             return self.THIRD_ARG_POS
         elif self.thirdStatLevel == 10:
             return self.SEC_ARG_POS

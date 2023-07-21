@@ -59,9 +59,10 @@ def test_core_random_max_level_exception():
             assert curCore.thirdStatLevel <= 10, "Third stat reached impossible level."
 
 
-def test_core_fixed_leveling():
+@pytest.mark.parametrize("setVal", [0.00, 0.999999])
+def test_core_fixed_leveling(setVal: float):
     """ If return is fixed, then single stat should continously level 9 times and then likewise for the second and the third is left at level 2. """
-    curCore = HexaStatCore(rngFunc = getForcedValRand(0.00))
+    curCore = HexaStatCore(rngFunc = getForcedValRand(setVal))
 
     # first stat
     leveledStat = None
