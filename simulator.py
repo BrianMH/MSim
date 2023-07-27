@@ -23,7 +23,7 @@ class MarkovSim():
         """
         self.curFramework = fwork
 
-    def simulate(self, numTrials: int, simArgs: dict) -> list:
+    def simulate(self, numTrials: int, simArgs: dict, * , silent: bool = False) -> list:
         """
         Performs a simulation according to what is allowed by framework specifications. Only
         functions after a framework is selected.
@@ -32,7 +32,7 @@ class MarkovSim():
             raise ValueError("Number of trials must be a positive integer greater than 0.")
 
         resList = list()
-        for iterInd in tqdm(range(numTrials)):
+        for iterInd in tqdm(range(numTrials), disable = silent):
             if iterInd == 0:
                 resList.append(self.curFramework.checkAndPerformTrial(simArgs))
             else: # subseq would have no errors with same args otherwise
@@ -40,14 +40,14 @@ class MarkovSim():
 
         return resList
     
-    def gridSearch(self, numTrials: int, gridArgs: dict, simArgs: dict) -> dict:
+    def gridSearch(self, numTrials: int, gridArgs: dict, simArgs: dict, *, silent: bool = False) -> dict:
         """
         Performs a grid search across all parameters present in gridArgs and appends simArgs as
         constant parameters. Note that the total search space is equialent to the cartesian product
         of all key-value pairs in gridArgs.
         """
         resDict = dict()
-        with tqdm(total = reduce(lambda x,y:x*y, map(lambda dicTup: len(dicTup), gridArgs.values()), 1)) as pbar:
+        with tqdm(total = reduce(lambda x,y:x*y, map(lambda dicTup: len(dicTup), gridArgs.values()), 1), disable = silent) as pbar:
             for vDict in self.varDictGen(gridArgs):
                 # get dict result
                 curResult = self.simulate(numTrials, simArgs = {**vDict, **simArgs})

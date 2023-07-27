@@ -203,6 +203,7 @@ class HexaStatFramework(_FW):
 
         # flag for policy checking
         self.loadedPolicy = False
+        self.lastPolicyDir = ""
 
         # initialize our policy dict (indicates when to reset)
         # our state space will be (enhance_level, primary_level) tuples
@@ -211,6 +212,10 @@ class HexaStatFramework(_FW):
     def performTrial(self, target: int, policyPath: str, erdaFragLim: int) -> dict:
         """
         Performs a single execution of the hexa stat core trial session.
+
+        Args:
+            policyPath: The location of a pickled policy to load. Should be empty if unused.
+            forcePUpdate: Forces the policy to be updated in the proceeding execution.
         """
         # edge cases
         if target > HexaStatCore.MAX_STAT_LEVEL:
@@ -223,12 +228,16 @@ class HexaStatFramework(_FW):
         if erdaFragLim != 0:
             ignoreLims = False
 
-        # Either import new policy or adjust based on target level
-        try:
+        # Either import new policy or adjust based on target level if necessary
+        if not self.loadedPolicy or self.lastPolicyDir != policyPath:
+            forcePUpdate = False
             self.loadedPolicy = True
-            self.attemptPolicyImport(policyPath)
-        except RuntimeError:
-            self.updatePolicyTarget(target)
+            self.lastPolicyDir = policyPath
+            
+            try:
+                self.attemptPolicyImport(policyPath)
+            except RuntimeError:
+                self.updatePolicyTarget(target)
 
         # Then run simulation until target reached
         curCore = HexaStatCore(rngFunc = self.random)
@@ -254,17 +263,22 @@ class HexaStatFramework(_FW):
             "thirdLevel" : curCore.thirdStatLevel,
             "numResets" : totResets
         }
+    
+    def forceInjectPolicy(self, newPolicy: MutableMapping[tuple[int, int], bool]):
+        """ Allows the policy to be manipulated by the end user without a pickled value. """
+        self.policy = newPolicy
+        self.loadedPolicy = True
 
     def attemptPolicyImport(self, policyPath: str) -> None:
-        """ Tries to import a policy that represents a """
+        """ Tries to import a policy that represents a mapping from state space to action space """
         try:
             with open(policyPath, 'rb') as inFile:
                 curObj = pickle.load(inFile)
                 if not issubclass(curObj.__class__, dict):
-                    raise RuntimeError("Improper object type passed into load.")
+                    raise TypeError("Improper object type passed into load.")
                 self.policy = curObj
         except FileNotFoundError:
-            pass
+            raise RuntimeError # allows proper catching of empty directory contents
 
     def updatePolicyTarget(self, targetLevel: int) -> None:
         for lowerInd in range(1, targetLevel):
