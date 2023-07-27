@@ -230,7 +230,6 @@ class HexaStatFramework(_FW):
 
         # Either import new policy or adjust based on target level if necessary
         if not self.loadedPolicy or self.lastPolicyDir != policyPath:
-            forcePUpdate = False
             self.loadedPolicy = True
             self.lastPolicyDir = policyPath
             
