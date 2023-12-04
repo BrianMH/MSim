@@ -27,12 +27,12 @@ for analysis.
 ------- Upgrade Table (Table 1) --------                    ------------ Cost Table (Table 2) --------------
 Primary Level   | % success for enhance                         Sol Erda            |       Sol Erda Frags
 ----------------------------------------                    ------------------------------------------------
-      1-2       |         35 %                                      5               |           10
-      3-6       |         20 %                                      5               |           20
-       7        |         15 %                                      5               |           30
-       8        |         10 %                                      5               |           40
-       9        |         5 %                                       5               |           50
-      10        |         0 %                                       5               |           50
+      1-2       |         35 %                                      0               |           10
+      3-6       |         20 %                                      0               |           20
+       7        |         15 %                                      0               |           30
+       8        |         10 %                                      0               |           40
+       9        |         5 %                                       0               |           50
+      10        |         0 %                                       0               |           50
 
 
 Finally, a note on the policy function to be used when enhancing. By default, the policy function will simply choose to
@@ -52,7 +52,7 @@ class HexaStatCore():
     Container for hexa stat methods. Implements leveling and reset methods.
     """
     # consts
-    INIT_LEVEL = 1
+    INIT_LEVEL = 0
     MIN_RESET_LEVEL = 10
     MAX_LEVEL = 20
     MAX_STAT_LEVEL = 10
@@ -63,10 +63,10 @@ class HexaStatCore():
     THIRD_ARG_POS = 2
 
     # probs & costs
-    P_SUCC_VALS = [None, 0.35, 0.35, 0.2, 0.2, 0.2, 0.2, 0.15, 0.1, 0.05, 0]
-    PB_ERDA_FRAG_COST_VALS = [None, 10, 10, 20, 20, 20, 20, 30, 40, 50, 50]
-    PB_ERDA_COST_VALS = [None, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5]
-
+    P_SUCC_VALS = [0.35, 0.35, 0.35, 0.2, 0.2, 0.2, 0.2, 0.15, 0.1, 0.05, 0]
+    PB_ERDA_FRAG_COST_VALS = [10, 10, 10, 20, 20, 20, 20, 30, 40, 50, 50]
+    PB_ERDA_COST_VALS = [0] * 11
+    
     def __init__(self, *, rngFunc : Callable[[], float]|None = None):
         # initialize our level values
         self._nodeLevel = self.INIT_LEVEL
@@ -246,8 +246,9 @@ class HexaStatFramework(_FW):
             if not ignoreLims and totCost + curCore.curFragCost > erdaFragLim:
                 break
             
-            # Then proceed to enhance or reset based on our policy
-            if self.policy[(curCore.level, curCore.primaryStatLevel)]: # reset
+            # Then proceed to enhance or reset based on our policy (or default max reset if not set)
+            if (self.policy[(curCore.level, curCore.primaryStatLevel)] or 
+                (curCore.level == curCore.MAX_LEVEL and curCore.primaryStatLevel < target)): # reset
                 totResets += 1
                 curCore.resetNode()
             else:   # enhance

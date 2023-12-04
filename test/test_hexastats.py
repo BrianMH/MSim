@@ -38,21 +38,21 @@ def dictInit():
 def test_core_random_max_level():
     curCore = HexaStatCore(rngFunc = getSeededRand(RAND_SEED))
     
-    for _ in range(1, HexaStatCore.MAX_LEVEL):
+    for _ in range(1, HexaStatCore.MAX_LEVEL+1):
         curCore.levelNode()
         assert curCore.primaryStatLevel <= 10, "Primary stat reached impossible level."
         assert curCore.secondStatLevel <= 10, "Secondary stat reached impossible level."
         assert curCore.thirdStatLevel <= 10, "Third stat reached impossible level."
 
     assert curCore.level == 20, "Core could not reach maximum level."
-    assert sum([curCore.primaryStatLevel, curCore.secondStatLevel, curCore.thirdStatLevel])-3 == 19, "Total accumulated levels must be 19 at max stage node."
+    assert sum([curCore.primaryStatLevel, curCore.secondStatLevel, curCore.thirdStatLevel]) == 20, "Total accumulated levels must be 20 at max stage node."
 
 
 def test_core_random_max_level_exception():
     curCore = HexaStatCore(rngFunc = getSeededRand(RAND_SEED))
 
     with pytest.raises(Exception):
-        for _ in range(HexaStatCore.MAX_LEVEL):
+        for _ in range(HexaStatCore.MAX_LEVE+1):
             curCore.levelNode()
             assert curCore.primaryStatLevel <= 10, "Primary stat reached impossible level."
             assert curCore.secondStatLevel <= 10, "Secondary stat reached impossible level."
@@ -67,7 +67,7 @@ def test_core_fixed_leveling(setVal: float):
     # first stat
     leveledStat = None
     lastLevel = None
-    for _ in range(1, HexaStatCore.MAX_STAT_LEVEL):
+    for _ in range(HexaStatCore.MAX_STAT_LEVEL):
         curCore.levelNode()
 
         if leveledStat is None:
@@ -84,12 +84,12 @@ def test_core_fixed_leveling(setVal: float):
     # then second stat
     leveledStat = None
     lastLevel = None
-    for _ in range(1, HexaStatCore.MAX_STAT_LEVEL):
+    for _ in range(HexaStatCore.MAX_STAT_LEVEL):
         curCore.levelNode()
 
         if leveledStat is None:
             for attrName in ["primary", "second", "third"]:
-                if getattr(curCore, attrName + "StatLevel") not in {1, HexaStatCore.MAX_STAT_LEVEL}:
+                if getattr(curCore, attrName + "StatLevel") not in {0, HexaStatCore.MAX_STAT_LEVEL}:
                     leveledStat = attrName + "StatLevel"
 
             assert leveledStat is not None, "Could not detect a leveled value following node leveling"
@@ -98,17 +98,21 @@ def test_core_fixed_leveling(setVal: float):
             assert getattr(curCore, leveledStat) > lastLevel
             lastLevel = getattr(curCore, leveledStat)
 
-    # then final stat can only level once
-    curCore.levelNode()
+    # then final stat can no longer level (10/10/0)
+    try:
+        curCore.levelNode()
+        assert False, "Final stat can no longer be leveled at max level"
+    except:
+        pass
 
     for attrName in ["primary", "second", "third"]:
-        if getattr(curCore, attrName + "StatLevel") not in {1, HexaStatCore.MAX_STAT_LEVEL}:
+        if getattr(curCore, attrName + "StatLevel") not in {0, HexaStatCore.MAX_STAT_LEVEL}:
             leveledStat = attrName + "StatLevel"
 
     assert leveledStat is not None, "Could not detect final leveled value following node leveling"
     lastLevel = getattr(curCore, leveledStat)
     assert curCore.level == 20, "Could not reach max level from enhancements"
-    assert sum([curCore.primaryStatLevel, curCore.secondStatLevel, curCore.thirdStatLevel])-3 == 19, "Total accumulated levels must be 19 at max stage node."
+    assert sum([curCore.primaryStatLevel, curCore.secondStatLevel, curCore.thirdStatLevel]) == 20, "Total accumulated levels must be 19 at max stage node."
 
 
 def test_core_reset():
@@ -116,15 +120,15 @@ def test_core_reset():
 
     # test all points of reset
     for resLevel in range(HexaStatCore.MIN_RESET_LEVEL, HexaStatCore.MAX_LEVEL+1):
-        for _ in range(1, resLevel):
+        for _ in range(resLevel):
             curCore.levelNode()
         curCore.resetNode()
     
         # make sure everything back to beginning
-        assert curCore.primaryStatLevel == 1, "Did not reset primary level."
-        assert curCore.secondStatLevel == 1, "Did not reset secondary level."
-        assert curCore.thirdStatLevel == 1, "Did not reset other secondary stat level."
-        assert curCore.level == 1, "Did not reset node level."
+        assert curCore.primaryStatLevel == 0, "Did not reset primary level."
+        assert curCore.secondStatLevel == 0, "Did not reset secondary level."
+        assert curCore.thirdStatLevel == 0, "Did not reset other secondary stat level."
+        assert curCore.level == 0, "Did not reset node level."
 
 
 def test_core_framework_no_limit():
@@ -132,9 +136,9 @@ def test_core_framework_no_limit():
 
     # Attempt test. Should be between init_cost and final_cost
     res = curFw.performTrial(1, "", 0)
-    assert MIN_COST * 19 <= res["totalFragCost"] <= MAX_COST*19, "Cost not between realistic minimum/maximum"
+    assert MIN_COST * 20 <= res["totalFragCost"] <= MAX_COST*20, "Cost not between realistic minimum/maximum"
     assert res["numResets"] == 0, "Expected 0 resets from a trial target of 1"
-    assert res["totalEnhances"] == 19, "Expected 19 total enhancements from a trial target of 1"
+    assert res["totalEnhances"] == 20, "Expected 19 total enhancements from a trial target of 1"
 
 
 def test_core_framework_with_limit(min_lim: int = 10, max_lim: int = 1000, interval: int = 50):
