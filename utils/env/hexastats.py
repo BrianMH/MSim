@@ -34,6 +34,8 @@ Primary Level   | % success for enhance                         Sol Erda        
        9        |         5 %                                       0               |           50
       10        |         0 %                                       0               |           50
 
+Note: A new Sunny Sunday seemed to release that prevents the % success from dropping below 20%. For now, this just
+      gets implemented as a floor policy on the function.
 
 Finally, a note on the policy function to be used when enhancing. By default, the policy function will simply choose to
 always enhance the current core regardless of either the primary stat level or the overall stat level. However, a 
@@ -143,8 +145,13 @@ class HexaStatCore():
         self._nodeLevel = self.INIT_LEVEL
         self._statLevels = [self.INIT_LEVEL]*3
 
-    def isMaxLevel(self):
-        """ Returns whether or not the node has reached the maximum level. """
+    def activateSSEffect(self) -> None:
+        """
+        Modifies the transition tables to apply the Sunny Sunday effect.
+        """
+        self.P_SUCC_VALS[7] = 0.20
+        self.P_SUCC_VALS[8] = 0.20
+        self.P_SUCC_VALS[9] = 0.20
     
     @property
     def primaryStatLevel(self) -> int:
@@ -184,16 +191,19 @@ class HexaStatFramework(_FW):
     
     ARG_TYPES : dict[str, type|tuple[type,...]] = {"Target Primary Level": int,
                                                    "Custom Policy Name": str,
-                                                   "Erda Frag Limit": int}
+                                                   "Erda Frag Limit": int,
+                                                   "Sunny Sunday Effect": str}
     
     ARG_MAN = {"Target Primary Level": "Sets the desired hex stat primary level",
                "Custom Policy Name": "Declares location of the custom policy object",
-               "Erda Frag Limit": "Limits the amount of erda fragments used (0 if infinite)"}
+               "Erda Frag Limit": "Limits the amount of erda fragments used (0 if infinite)",
+               "Sunny Sunday Effect": "Determines whether the Sunny Sunday effect should be applied (y/n)"}
     
     # CLASS INTRINSICS
     ARG_MAPPING = {"Target Primary Level": "target",
                    "Custom Policy Name": "policyPath",
-                   "Erda Frag Limit": "erdaFragLim"}
+                   "Erda Frag Limit": "erdaFragLim",
+                   "Sunny Sunday Effect": "ssEffect"}
     
     
     def __init__(self, rSeed: int|None = None):
@@ -209,7 +219,7 @@ class HexaStatFramework(_FW):
         # our state space will be (enhance_level, primary_level) tuples
         self.policy : MutableMapping[tuple[int, int], bool] = defaultdict(lambda : False)
 
-    def performTrial(self, target: int, policyPath: str, erdaFragLim: int) -> dict:
+    def performTrial(self, target: int, policyPath: str, erdaFragLim: int, ssEffect: str) -> dict:
         """
         Performs a single execution of the hexa stat core trial session.
 
@@ -238,8 +248,10 @@ class HexaStatFramework(_FW):
             except RuntimeError:
                 self.updatePolicyTarget(target)
 
-        # Then run simulation until target reached
+        # Then run simulation until target reached    
         curCore = HexaStatCore(rngFunc = self.random)
+        if ssEffect == "y":
+            curCore.activateSSEffect()
         totCost, totResets, numEnhances = 0, 0, 0
         while curCore.level != curCore.MAX_LEVEL or curCore.primaryStatLevel < target:
             # first make sure our current frag cost doesn't exceed the max
