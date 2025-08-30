@@ -83,8 +83,8 @@ class ItemStarForceMarkovValues():
         return lambda sv, ps, pf, pb, ca : (ps, pf + 0.3*pb, 0.7*pb, ca) if 15 <= sv[1] <= 21 else (ps, pf, pb, ca)
     
     @staticmethod
-    def _MVPCostEvent() -> EventReturn:
-        return lambda sv, ps, pf, pb, ca: (ps, pf, pb, 0.95*ca) if sv[1] <= 17 else (ps, pf, pb, ca)
+    def _MVPCostEvent(mvpDiscount = 0.10) -> EventReturn:
+        return lambda sv, ps, pf, pb, ca: (ps, pf, pb, (1.0-mvpDiscount)*ca) if sv[1] <= 17 else (ps, pf, pb, ca)
     
     @staticmethod
     def _StarCatchEvent() -> EventReturn:
@@ -93,6 +93,10 @@ class ItemStarForceMarkovValues():
                      (P_SUCC, P_FAIL, P_BOOM) -> ( 1.05 * P_SUCC, (P_FAIL)/(P_FAIL+P_BOOM)*(1 - 1.05 * P_SUCC), (P_BOOM)/(P_FAIL+P_BOOM)*(1 - 1.05 * P_SUCC))
         """
         return lambda sv, ps, pf, pb, ca: (1.05*ps, (pf/(pf+pb))*(1-1.05*ps), (pb/(pf+pb))*(1-1.05*ps), ca)
+    
+    @staticmethod
+    def _SafeguardEvent() -> EventReturn:
+        return lambda sv, ps, pf, pb, ca: (ps, round(pf+pb, 5), 0.0, ca + 1) if 15 <= sv[1] <= 16 else (ps, pf, pb, ca)
 
 
 class ItemStarForce():
@@ -126,6 +130,7 @@ class ItemStarForce():
 
         # And initialize any "events" if they will be necessary by associating them with the current state
         self.eventArray = events
+        self.eventsProcessed = False
 
         # We can adjust the probability values given the events now...
         self.adjustEventProbsAndCost()
@@ -156,7 +161,23 @@ class ItemStarForce():
 
             This function also calculates the realized cost so that it isn't calculated on the fly every time.
         """
+        # Do not process events if they already have been taken into account
+        if self.eventsProcessed:
+            return 
         
+        self.eventsProcessed = True
+        for curEvent in self.eventArray:
+            for i in range(len(self._P_SUCC)):
+                # create the item state
+                itemState = (self.itemLevel, i)
+                
+                # and use it to calculate the new P and C values
+                self._P_SUCC[i], self._P_FAIL[i], self._P_BOOM[i], self._COST_MULT[i] = curEvent(itemState, self._P_SUCC[i], self._P_FAIL[i], self._P_BOOM[i], self._COST_MULT[i])
+
+        print(self._P_SUCC)
+        print(self._P_FAIL)
+        print(self._P_BOOM)
+        print(self._COST_MULT)
 
     @property
     def canStarForce(self) -> bool:
@@ -197,18 +218,21 @@ class StarForceFramework(_FW):
     ARG_TYPES : dict[str, type|tuple[type,...]] = {"Target SF Level": int,
                                                    "Item Level": int,
                                                    "Start SF Level": int,
+                                                   "Safeguard": str,
                                                    "KMS Cost Event": str,
                                                    "KMS Boom Event": str}
     
     ARG_MAN = {"Target SF Level": "Sets the desired Star Force level [0-30]",
                "Item Level": "The level of the item to star force [0-250]",
                "Start SF Level": "The SF point to start from (0 by default) [0-30]",
+               "Safeguard": "Whether to protect the item from booms for attempts on 15/16 stars [y/n]",
                "KMS Cost Event": "Applies a 30%% discount to the cost of star forcing (KMS Sunday Event) (y/n)",
                "KMS Boom Event": "Applies a 30%% reduced chance to boom while star forcing, but only up to 21* (KMS Sunday Event) (y/n)"}    
     # CLASS INTRINSICS
     ARG_MAPPING = {"Target SF Level": "targetSfLevel",
                    "Item Level": "itemLevel",
                    "Start SF Level": "startSfLevel",
+                   "Safeguard": "safeguard",
                    "KMS Cost Event": "eventKmsCost",
                    "KMS Boom Event": "eventKmsBoom"}
     
@@ -218,8 +242,21 @@ class StarForceFramework(_FW):
         self.rng = _Rand(rSeed)
         self.random = self.rng.random
 
-    def performTrial(self, targetSfLevel: int, itemLevel: int, startSfLevel: int, eventKmsCost: str, eventKmsBoom: str) -> dict:
+    def performTrial(self, targetSfLevel: int, itemLevel: int, safeguard: str, startSfLevel: int, eventKmsCost: str, eventKmsBoom: str) -> dict:
         """
             Performs a single markov trial simulation. In this case, creates an item with a given starting SF Level, and then
             star forces it until it reaches the target SF level and returns a dict containing the total meso cost and number of booms.
         """
+        # edge cases and input checking
+        if(not 0 <= targetSfLevel <= 30 or not 0 <= startSfLevel <= 30):
+            raise TypeError("Target SF value or starting SF value must lie between 0 and 30")
+        
+        # create our item with the correct events
+        collectedEvents = list()
+        if(eventKmsCost.lower() == "y"):
+            collectedEvents.append(ItemStarForceMarkovValues._KMSCostEvent())
+        if(eventKmsBoom.lower() == "y"):
+            collectedEvents.append(ItemStarForceMarkovValues._KMSBoomEvent())
+        if(safeguard.lower() == "y"):
+            collectedEvents.append(ItemStarForceMarkovValues._SafeguardEvent())
+        itemToStar = ItemStarForce(itemLevel, startSfLevel, region="kms", events=collectedEvents)
