@@ -30,6 +30,7 @@ from ..framework import Framework as _FW
 from random import Random as _Rand
 from typing import Callable
 from enum import Enum
+from functools import cache, partial
 
 
 '''
@@ -53,7 +54,7 @@ class ItemStarForceMarkovValues():
         MSEA = "msea"
 
     @staticmethod
-    def _KMSMatrix() -> tuple[list[float], list[float], list[float], Callable[[int], int]]:
+    def _KMSMatrix() -> tuple[list[float], list[float], list[float], Callable[[int, int], int]]:
         P_SUCC_VALS: list[float] = [.95, .90, .85, .85, .80, .75, .70, .65, .60, .55, .50, .45, .40, .35, .30, .30, .30, .15, .15, .15, .30, .15, .15, .10, .10, .10, .07, .05, .03, .01]
         P_FAIL_VALS: list[float] = [.05, .10, .15, .15, .20, .25, .30, .35, .40, .45, .50, .55, .60, .65, .70, .679, .679, .782, .782, .765, .595, .7225, .68, .72, .72, .72, .744, .76, .776, .792]
         P_BOOM_VALS: list[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, .021, .021, .068, .068, .085, .105, .1275, .17, .18, .18, .18, .186, .19, .194, .198]
@@ -63,7 +64,7 @@ class ItemStarForceMarkovValues():
         return (P_SUCC_VALS, P_FAIL_VALS, P_BOOM_VALS, costFunctor)
     
     @staticmethod
-    def returnRegionMatrix(region: str) -> tuple[list[float], list[float], list[float], Callable[[int], int]]:
+    def returnRegionMatrix(region: str) -> tuple[list[float], list[float], list[float], Callable[[int, int], int]]:
         match region:
             case ItemStarForceMarkovValues.RegionEnum.KMS.value:
                 return ItemStarForceMarkovValues._KMSMatrix()
@@ -83,8 +84,8 @@ class ItemStarForceMarkovValues():
         return lambda sv, ps, pf, pb, ca : (ps, pf + 0.3*pb, 0.7*pb, ca) if 15 <= sv[1] <= 21 else (ps, pf, pb, ca)
     
     @staticmethod
-    def _MVPCostEvent(mvpDiscount = 0.10) -> EventReturn:
-        return lambda sv, ps, pf, pb, ca: (ps, pf, pb, (1.0-mvpDiscount)*ca) if sv[1] <= 17 else (ps, pf, pb, ca)
+    def _MVPCostEvent(mvpPDisc = 10) -> EventReturn:
+        return lambda sv, ps, pf, pb, ca: (ps, pf, pb, ((100-mvpPDisc)/100)*ca) if sv[1] <= 17 else (ps, pf, pb, ca)
     
     @staticmethod
     def _StarCatchEvent() -> EventReturn:
@@ -127,6 +128,8 @@ class ItemStarForce():
         self._P_SUCC, self._P_FAIL, self._P_BOOM, self._costFunctor = ItemStarForceMarkovValues.returnRegionMatrix(region)
         self._COST_MULT = [1] * len(self._P_SUCC)
         self._maxStarValue = len(self._P_SUCC)
+        self.curCostForStar = partial(self._costFunctor, self.itemLevel)
+        self.decreaseOnFail = False
 
         # And initialize any "events" if they will be necessary by associating them with the current state
         self.eventArray = events
@@ -146,15 +149,34 @@ class ItemStarForce():
             raise RuntimeError("Item cannot currently be taped. Make sure it is not boomed or maxed already.")
         
         # Then attempt to tap and return the cost of the tap.
-        curRoll = self.rng
+        (ps, pf, pb, cm) = self._getCurRollProbs()
+        curRoll = self.rng()
+
+        # Find out the area under which the roll lies
+        if 0 <= curRoll < ps:
+            # success roll
+            self._starValue += 1
+        elif ps <= curRoll < ps + pf:
+            # fail roll (static level unless decrease on fail)
+            if self.decreaseOnFail:
+                self._starValue -= 1
+        elif ps + pf <= curRoll < ps + pf + pb:
+            # boom roll
+            self.isBoomed = True
+
+        # cost is consistent, so it gets calculated immediately
+        return round(self.curCostForStar(self.starValue), -2) * cm
+
 
     def reviveItem(self) -> None:
         """
             Unbooms an item (Used only to take up a step in the markov chain)
         """
         self.boomed = False
+        self._starValue = 12
 
-    def adjustEventProbsAndCost(self) -> None:
+    @cache
+    def adjustEventProbsAndCost(self, region: str, eventMarkers: tuple[str]) -> None:
         """
             Uses the current set of events to adjust the set of probabilities the class is currently initialized with. Once finished, deletes
             the set of events so that this cannot have a compounded effect.
@@ -173,11 +195,6 @@ class ItemStarForce():
                 
                 # and use it to calculate the new P and C values
                 self._P_SUCC[i], self._P_FAIL[i], self._P_BOOM[i], self._COST_MULT[i] = curEvent(itemState, self._P_SUCC[i], self._P_FAIL[i], self._P_BOOM[i], self._COST_MULT[i])
-
-        print(self._P_SUCC)
-        print(self._P_FAIL)
-        print(self._P_BOOM)
-        print(self._COST_MULT)
 
     @property
     def canStarForce(self) -> bool:
@@ -203,6 +220,17 @@ class ItemStarForce():
     def itemLevel(self) -> int:
         return self._itemLevel
     
+    ##########################################################
+    #              HELPER METHODS                            #
+    ##########################################################
+
+    def _getCurRollProbs(self):
+        """
+        Given the item's state, return the tuple of probabilities and costs associated with a single trial in the following order:
+         (P_SUCCESS, P_FAIL, P_BOOM, COST_MULT)
+        """
+        return (curArr[self.starValue] for curArr in [self._P_SUCC, self._P_FAIL, self._P_BOOM, self._COST_MULT])
+    
 
 class StarForceFramework(_FW):
     """
@@ -215,24 +243,27 @@ class StarForceFramework(_FW):
                "specific star forcing (reaching X stars w/ no meso cap). Does not work with superior items.\n" +
                "Keeps track of total meso cost and boom occurrences.")
     
-    ARG_TYPES : dict[str, type|tuple[type,...]] = {"Target SF Level": int,
-                                                   "Item Level": int,
+    ARG_TYPES : dict[str, type|tuple[type,...]] = {"Item Level": int,
                                                    "Start SF Level": int,
+                                                   "Target SF Level": int,
                                                    "Safeguard": str,
+                                                   "MVP Bonus %": int,
                                                    "KMS Cost Event": str,
                                                    "KMS Boom Event": str}
     
-    ARG_MAN = {"Target SF Level": "Sets the desired Star Force level [0-30]",
-               "Item Level": "The level of the item to star force [0-250]",
+    ARG_MAN = {"Item Level": "The level of the item to star force [0-250]",
                "Start SF Level": "The SF point to start from (0 by default) [0-30]",
+               "Target SF Level": "Sets the desired Star Force level [0-30]",
                "Safeguard": "Whether to protect the item from booms for attempts on 15/16 stars [y/n]",
+               "MVP Bonus %": "The amount of discount received from the user's MVP status [0-10]",
                "KMS Cost Event": "Applies a 30%% discount to the cost of star forcing (KMS Sunday Event) (y/n)",
                "KMS Boom Event": "Applies a 30%% reduced chance to boom while star forcing, but only up to 21* (KMS Sunday Event) (y/n)"}    
     # CLASS INTRINSICS
-    ARG_MAPPING = {"Target SF Level": "targetSfLevel",
-                   "Item Level": "itemLevel",
+    ARG_MAPPING = {"Item Level": "itemLevel",
                    "Start SF Level": "startSfLevel",
+                   "Target SF Level": "targetSfLevel",
                    "Safeguard": "safeguard",
+                   "MVP Bonus %": "mvpBonusVal",
                    "KMS Cost Event": "eventKmsCost",
                    "KMS Boom Event": "eventKmsBoom"}
     
@@ -242,7 +273,7 @@ class StarForceFramework(_FW):
         self.rng = _Rand(rSeed)
         self.random = self.rng.random
 
-    def performTrial(self, targetSfLevel: int, itemLevel: int, safeguard: str, startSfLevel: int, eventKmsCost: str, eventKmsBoom: str) -> dict:
+    def performTrial(self, targetSfLevel: int, itemLevel: int, safeguard: str, startSfLevel: int, eventKmsCost: str, eventKmsBoom: str, mvpBonusVal: int) -> dict:
         """
             Performs a single markov trial simulation. In this case, creates an item with a given starting SF Level, and then
             star forces it until it reaches the target SF level and returns a dict containing the total meso cost and number of booms.
@@ -250,13 +281,38 @@ class StarForceFramework(_FW):
         # edge cases and input checking
         if(not 0 <= targetSfLevel <= 30 or not 0 <= startSfLevel <= 30):
             raise TypeError("Target SF value or starting SF value must lie between 0 and 30")
+        if(not 0 <= mvpBonusVal <= 10):
+            raise TypeError("MVP Bonus must be between 0 - 10%")
+        if(startSfLevel >= 15 and targetSfLevel < 12):
+            raise AssertionError("Impossible scenario. Star force can never go under 12 again.")
         
-        # create our item with the correct events
+        # create our item with the correct ORDER
+        # Cost events may happen in any order, BUT probability adjusting events cannot
         collectedEvents = list()
         if(eventKmsCost.lower() == "y"):
             collectedEvents.append(ItemStarForceMarkovValues._KMSCostEvent())
+        if(mvpBonusVal > 0):
+            collectedEvents.append(ItemStarForceMarkovValues._MVPCostEvent(mvpBonusVal))
         if(eventKmsBoom.lower() == "y"):
             collectedEvents.append(ItemStarForceMarkovValues._KMSBoomEvent())
         if(safeguard.lower() == "y"):
             collectedEvents.append(ItemStarForceMarkovValues._SafeguardEvent())
         itemToStar = ItemStarForce(itemLevel, startSfLevel, region="kms", events=collectedEvents)
+
+        # And then keep tapping our item until we hit our desired star while keeping track of some data to eventually return
+        boomCount = 0
+        totalCost = 0
+        tapCount = 0
+        while(itemToStar.starValue != targetSfLevel):
+            if itemToStar.canStarForce():
+                totalCost += itemToStar.attemptStarForce()
+                tapCount += 1
+            else: # item is boomed so revive it
+                itemToStar.reviveItem()
+                boomCount += 1
+
+        return {
+            "cost" : totalCost,
+            "booms" : boomCount,
+            "taps" : tapCount
+        }
